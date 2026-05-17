@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Smart P2P Automated Tracker</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 950px;
+            width: 100%;
+        }
+        h2 {
+            color: #333;
+            margin-top: 0;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .parser-section {
+            background-color: #f8f9fa;
+            border: 1px dashed #007bff;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+        }
+        .control-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .global-buy-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: bold;
+            color: #856404;
+        }
+        .global-buy-box input {
+            width: 80px;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: monospace;
+            resize: vertical;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #555;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            cursor: pointer;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .btn-parse {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-add {
+            background-color: #28a745;
+            color: white;
+            margin-top: 15px;
+        }
+        .btn-delete {
+            background-color: #dc3545;
+            color: white;
+            padding: 6px 12px;
+        }
+        .results-box {
+            margin-top: 30px;
+            background-color: #e9ecef;
+            padding: 20px;
+            border-radius: 6px;
+        }
+        .results-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        .highlight {
+            font-weight: bold;
+            color: #28a745;
+            font-size: 1.3em;
+        }
+        .status-msg {
+            font-weight: bold;
+            margin-top: 8px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Bulk Smart P2P Automated Tracker</h2>
+    
+    <!-- Paste & Control Section -->
+    <div class="parser-section">
+        <label style="font-weight: bold; color: #333;">Paste Multiple Binance P2P Orders Here:</label>
+        <textarea id="p2pPasteInput" placeholder="Paste order blocks here..." style="margin-top: 5px;"></textarea>
+        
+        <div class="control-row">
+            <button class="btn-parse" onclick="parseBulkData()">Scan & Add All Trades</button>
+            
+            <div class="global-buy-box">
+                <label for="globalBuyRate">Set Global Buy Rate (INR):</label>
+                <input type="number" id="globalBuyRate" value="91.50" step="any" oninput="applyGlobalBuyRate()">
+            </div>
+        </div>
+        <div id="statusLog" class="status-msg"></div>
+    </div>
+
+    <!-- Main Calculator Table -->
+    <table id="tradeTable">
+        <thead>
+            <tr>
+                <th style="width: 120px;">Date</th>
+                <th>USDT Amount</th>
+                <th>Buy Rate (INR)</th>
+                <th>Sell Rate (INR)</th>
+                <th>Total Fiat (Buy)</th>
+                <th>Total Fiat (Sell)</th>
+                <th>Profit (INR)</th>
+                <th style="width: 80px;">Action</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+        </tbody>
+    </table>
+
+    <button class="btn-add" onclick="addNewBlankRow()">+ Add Blank Row Manually</button>
+
+    <!-- Aggregated Metrics -->
+    <div class="results-box">
+        <div class="results-row">
+            <span>Total USDT Sold Volume:</span>
+            <span id="totalUsdt" style="font-weight: bold;">0.00</span>
+        </div>
+        <div class="results-row">
+            <span>Total Capital Deployed (Buy):</span>
+            <span id="totalFiatBuy" style="font-weight: bold;">₹0.00</span>
+        </div>
+        <div class="results-row">
+            <span>Total Revenue Realized (Sell):</span>
+            <span id="totalFiatSell" style="font-weight: bold;">₹0.00</span>
+        </div>
+        <hr style="border: 0; border-top: 1px solid #ccc; margin: 15px 0;">
+        <div class="results-row">
+            <span style="font-weight: bold;">Weighted Avg Sell Rate:</span>
+            <span id="weightedSellAverage" style="font-weight: bold; color: #007bff;">₹0.00</span>
+        </div>
+        <div class="results-row">
+            <span style="font-weight: bold;">Total Net Profit:</span>
+            <span id="grandProfit" class="highlight">₹0.00</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    function applyGlobalBuyRate() {
+        const globalValue = parseFloat(document.getElementById('globalBuyRate').value) || 0;
+        const buyInputs = document.querySelectorAll('.buy-rate');
+        
+        buyInputs.forEach(input => {
+            input.value = globalValue > 0 ? globalValue.toFixed(2) : '';
+        });
+        
+        calculateAll();
+    }
+
+    function parseBulkData() {
+        const rawText = document.getElementById('p2pPasteInput').value;
+        const statusLog = document.getElementById('statusLog');
+        const globalBuyValue = parseFloat(document.getElementById('globalBuyRate').value) || 91.00;
+        
+        const tradeBlocks = rawText.split(/(?=Sell\s*\n?USDT)/gi);
+        let parsedCount = 0;
+        let skippedCount = 0;
+
+        tradeBlocks.forEach(block => {
+            if (!block.trim()) return;
+
+            const dateMatch = block.match(/\d{4}-\d{2}-\d{2}/);
+            const extractedDate = dateMatch ? dateMatch[0] : new Date().toISOString().split('T')[0];
+
+            const usdtMatch = block.match(/([\d,]+\.?\d*)\s*USDT/i);
+            const inrMatches = [...block.matchAll(/([\d,]+\.?\d*)\s*INR/gi)];
+
+            if (usdtMatch && inrMatches.length >= 2) {
+                const usdtAmount = parseFloat(usdtMatch[1].replace(/,/g, ''));
+                const inrValues = inrMatches.map(m => parseFloat(m[1].replace(/,/g, '')));
+                
+                const sellRate = Math.min(...inrValues);
+                const exactTotalSell = Math.max(...inrValues); // Grabs the exact total amount from the text
+
+                createRowData(extractedDate, usdtAmount, globalBuyValue.toFixed(2), sellRate, exactTotalSell.toFixed(2));
+                parsedCount++;
+            } else {
+                if(block.replace(/\s/g, '').length > 10) { 
+                    skippedCount++; 
+                }
+            }
+        });
+
+        statusLog.style.display = 'block';
+        if (parsedCount > 0) {
+            statusLog.style.color = '#28a745';
+            statusLog.textContent = `Successfully scanned and added ${parsedCount} trades! ` + (skippedCount > 0 ? `(Skipped ${skippedCount} unreadable segments)` : '');
+        } else {
+            statusLog.style.color = '#dc3545';
+            statusLog.textContent = 'Could not find any clear, valid P2P blocks to extract.';
+        }
+
+        document.getElementById('p2pPasteInput').value = '';
+    }
+
+    function createRowData(date, usdt, buyRate, sellRate, parsedTotalSell = null) {
+        const tbody = document.getElementById('tableBody');
+        const tr = document.createElement('tr');
+        
+        // If a parsed total sell price exists, we use it directly; otherwise fallback to math
+        const finalSellTotal = parsedTotalSell ? parsedTotalSell : (usdt && sellRate ? (usdt * sellRate).toFixed(2) : '0.00');
+
+        tr.innerHTML = `
+            <td><input type="text" value="${date}" oninput="calculateAll()"></td>
+            <td><input type="number" class="amount" value="${usdt}" oninput="calculateAll()" step="any"></td>
+            <td><input type="number" class="buy-rate" value="${buyRate}" oninput="calculateAll()" step="any"></td>
+            <td><input type="number" class="sell-rate" value="${sellRate}" oninput="onManualRateChange(this)" step="any"></td>
+            <td class="row-buy-total">0.00</td>
+            <td><input type="number" class="row-sell-total" value="${finalSellTotal}" oninput="calculateAll()" step="any"></td>
+            <td class="row-profit" style="font-weight:bold;">0.00</td>
+            <td><button class="btn-delete" onclick="deleteRow(this)">Delete</button></td>
+        `;
+        
+        tbody.appendChild(tr);
+        calculateAll();
+    }
+
+    // If the user manually overrides the individual cell Sell Rate, fix the row total instantly
+    function onManualRateChange(inputElement) {
+        const row = inputElement.closest('tr');
+        const amount = parseFloat(row.querySelector('.amount').value) || 0;
+        const sellRate = parseFloat(inputElement.value) || 0;
+        
+        row.querySelector('.row-sell-total').value = (amount * sellRate).toFixed(2);
+        calculateAll();
+    }
+
+    function addNewBlankRow() {
+        const today = new Date().toISOString().split('T')[0];
+        const globalBuyValue = parseFloat(document.getElementById('globalBuyRate').value) || 91.00;
+        createRowData(today, '', globalBuyValue.toFixed(2), '', '');
+    }
+
+    function deleteRow(button) {
+        const row = button.parentNode.parentNode;
+        row.parentNode.removeChild(row);
+        calculateAll();
+    }
+
+    function calculateAll() {
+        const rows = document.querySelectorAll('#tableBody tr');
+        let totalUsdt = 0;
+        let totalFiatBuy = 0;
+        let totalFiatSell = 0;
+        let grandProfit = 0;
+
+        rows.forEach(row => {
+            const amount = parseFloat(row.querySelector('.amount').value) || 0;
+            const buyRate = parseFloat(row.querySelector('.buy-rate').value) || 0;
+            
+            // Read directly from the Total Sell Input field instead of forcing absolute math multiplication
+            const rowSellTotal = parseFloat(row.querySelector('.row-sell-total').value) || 0;
+            
+            const rowBuyTotal = amount * buyRate;
+            const rowProfit = rowSellTotal - rowBuyTotal;
+
+            row.querySelector('.row-buy-total').textContent = rowBuyTotal.toFixed(2);
+            row.querySelector('.row-profit').textContent = rowProfit.toFixed(2);
+
+            row.querySelector('.row-profit').style.color = rowProfit >= 0 ? '#28a745' : '#dc3545';
+
+            totalUsdt += amount;
+            totalFiatBuy += rowBuyTotal;
+            totalFiatSell += rowSellTotal;
+            grandProfit += rowProfit;
+        });
+
+        const weightedSellAvg = totalUsdt > 0 ? (totalFiatSell / totalUsdt) : 0;
+
+        document.getElementById('totalUsdt').textContent = totalUsdt.toFixed(2);
+        document.getElementById('totalFiatBuy').textContent = '₹' + totalFiatBuy.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        document.getElementById('totalFiatSell').textContent = '₹' + totalFiatSell.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        document.getElementById('weightedSellAverage').textContent = '₹' + weightedSellAvg.toFixed(2);
+        document.getElementById('grandProfit').textContent = '₹' + grandProfit.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+        
+        document.getElementById('grandProfit').style.color = grandProfit >= 0 ? '#28a745' : '#dc3545';
+    }
+</script>
+
+</body>
+</html>
